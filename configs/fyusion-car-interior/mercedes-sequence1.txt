@@ -1,7 +1,7 @@
 ### INPUT
-datadir = /home/fyusion/Documents/datasets/nerfplusplus/tanks_and_temples
-scene = tat_training_Truck
-expname = tat_training_Truck
+datadir = /home/fyusion/Documents/datasets/nerfplusplus/fyusion-car-interior/
+scene = mercedes-sequence1
+expname = mercedes-sequence1-test3
 basedir = ./logs
 config = None
 ckpt_path = None
@@ -9,7 +9,7 @@ no_reload = False
 testskip = 1
 
 ### TRAINING
-N_iters = 500001
+N_iters = 200001
 N_rand = 1024
 lrate = 0.0005
 lrate_decay_factor = 0.1
@@ -20,7 +20,7 @@ cascade_level = 2
 cascade_samples = 64,128
 
 ### TESTING
-chunk_size = 8192
+chunk_size = 16384
 
 ### RENDERING
 det = False

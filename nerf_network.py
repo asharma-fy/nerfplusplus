@@ -1,7 +1,7 @@
 import torch
 import torch.nn as nn
-# import torch.nn.functional as F
-# import numpy as np
+import math
+
 from collections import OrderedDict
 
 import logging
@@ -39,21 +39,34 @@ class Embedder(nn.Module):
 
         self.freq_bands = self.freq_bands.numpy().tolist()
 
-    def forward(self, input):
+    def get_weight(self, alpha, k):
+        if alpha < k:
+            weight = 0.0
+        elif alpha - k >= 0 and alpha - k < 1:
+            weight = (1 - torch.cos(torch.tensor((alpha - k) * math.pi))) / 2
+        else:
+            weight = 1.0
+        return weight
+
+    def forward(self, x, progress=1.0):
         '''
         :param input: tensor of shape [..., self.input_dim]
         :return: tensor of shape [..., self.out_dim]
         '''
-        assert (input.shape[-1] == self.input_dim)
+        assert (x.shape[-1] == self.input_dim)
 
         out = []
         if self.include_input:
-            out.append(input)
+            out.append(x)
+        alpha = int(progress * len(self.freq_bands))
 
         for i in range(len(self.freq_bands)):
             freq = self.freq_bands[i]
+            weight = self.get_weight(alpha, i)
+
             for p_fn in self.periodic_fns:
-                out.append(p_fn(input * freq))
+                out.append(weight * p_fn(x * freq))
+
         out = torch.cat(out, dim=-1)
 
         assert (out.shape[-1] == self.out_dim)

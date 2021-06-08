@@ -71,7 +71,7 @@ class NerfNet(nn.Module):
                              input_ch_viewdirs=self.bg_embedder_viewdir.out_dim,
                              use_viewdirs=args.use_viewdirs)
 
-    def forward(self, ray_o, ray_d, fg_z_max, fg_z_vals, bg_z_vals):
+    def forward(self, ray_o, ray_d, fg_z_max, fg_z_vals, bg_z_vals, progress=1.0):
         '''
         :param ray_o, ray_d: [..., 3]
         :param fg_z_max: [...,]
@@ -89,9 +89,9 @@ class NerfNet(nn.Module):
         fg_ray_d = ray_d.unsqueeze(-2).expand(dots_sh + [N_samples, 3])
         fg_viewdirs = viewdirs.unsqueeze(-2).expand(dots_sh + [N_samples, 3])
         fg_pts = fg_ray_o + fg_z_vals.unsqueeze(-1) * fg_ray_d
-        input = torch.cat((self.fg_embedder_position(fg_pts),
-                           self.fg_embedder_viewdir(fg_viewdirs)), dim=-1)
-        fg_raw = self.fg_net(input)
+        x = torch.cat((self.fg_embedder_position(fg_pts, progress),
+                           self.fg_embedder_viewdir(fg_viewdirs, progress)), dim=-1)
+        fg_raw = self.fg_net(x)
         # alpha blending
         fg_dists = fg_z_vals[..., 1:] - fg_z_vals[..., :-1]
         # account for view directions
@@ -110,14 +110,14 @@ class NerfNet(nn.Module):
         bg_ray_d = ray_d.unsqueeze(-2).expand(dots_sh + [N_samples, 3])
         bg_viewdirs = viewdirs.unsqueeze(-2).expand(dots_sh + [N_samples, 3])
         bg_pts, _ = depth2pts_outside(bg_ray_o, bg_ray_d, bg_z_vals)  # [..., N_samples, 4]
-        input = torch.cat((self.bg_embedder_position(bg_pts),
-                           self.bg_embedder_viewdir(bg_viewdirs)), dim=-1)
+        x = torch.cat((self.bg_embedder_position(bg_pts, progress),
+                           self.bg_embedder_viewdir(bg_viewdirs, progress)), dim=-1)
         # near_depth: physical far; far_depth: physical near
-        input = torch.flip(input, dims=[-2,])
+        x = torch.flip(x, dims=[-2,])
         bg_z_vals = torch.flip(bg_z_vals, dims=[-1,])           # 1--->0
         bg_dists = bg_z_vals[..., :-1] - bg_z_vals[..., 1:]
         bg_dists = torch.cat((bg_dists, HUGE_NUMBER * torch.ones_like(bg_dists[..., 0:1])), dim=-1)  # [..., N_samples]
-        bg_raw = self.bg_net(input)
+        bg_raw = self.bg_net(x)
         bg_alpha = 1. - torch.exp(-bg_raw['sigma'] * bg_dists)  # [..., N_samples]
         # Eq. (3): T
         # maths show weights, and summation of weights along a ray, are always inside [0, 1]
@@ -168,14 +168,14 @@ class NerfNetWithAutoExpo(nn.Module):
             logger.info('\n'.join(self.img_names))
             self.autoexpo_params = nn.ParameterDict(OrderedDict([(x, nn.Parameter(torch.Tensor([0.5, 0.]))) for x in self.img_names]))
 
-    def forward(self, ray_o, ray_d, fg_z_max, fg_z_vals, bg_z_vals, img_name=None):
+    def forward(self, ray_o, ray_d, fg_z_max, fg_z_vals, bg_z_vals, img_name=None, progress=1.0):
         '''
         :param ray_o, ray_d: [..., 3]
         :param fg_z_max: [...,]
         :param fg_z_vals, bg_z_vals: [..., N_samples]
         :return
         '''
-        ret = self.nerf_net(ray_o, ray_d, fg_z_max, fg_z_vals, bg_z_vals)
+        ret = self.nerf_net(ray_o, ray_d, fg_z_max, fg_z_vals, bg_z_vals, progress)
 
         if img_name is not None:
             img_name = remap_name(img_name)

@@ -69,7 +69,6 @@ class RaySamplerSingleImage(object):
                 self.img = self.img.reshape((-1, 3))
             else:
                 self.img = None
-
             if self.mask_path is not None:
                 self.mask = imageio.imread(self.mask_path).astype(np.float32) / 255.
                 self.mask = cv2.resize(self.mask, (self.W, self.H), interpolation=cv2.INTER_NEAREST)
